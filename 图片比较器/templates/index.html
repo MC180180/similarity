@@ -349,7 +349,221 @@
             font-size: 12px;
             margin-top: auto;
         }
+        .progress-container {
+    margin-bottom: 25px;
+    display: none;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.progress-container.active {
+    display: block;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.progress-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.progress-percentage {
+    font-size: 18px;
+    font-weight: 700;
+    color: #3498db;
+}
+
+.progress-bar-container {
+    margin-bottom: 15px;
+}
+
+.progress-bar {
+    height: 12px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    width: 0%;
+    transition: width 0.5s ease;
+    position: relative;
+    border-radius: 10px;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
+    border-radius: 10px;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.progress-status {
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 15px;
+}
+
+.progress-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.progress-current {
+    background-color: #f8f9fa;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.progress-eta {
+    display: flex;
+    align-items: center;
+}
+
+.progress-eta-icon {
+    margin-right: 5px;
+    color: #6c757d;
+}
+
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    position: relative;
+}
+
+.progress-steps::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #e9ecef;
+    z-index: 0;
+}
+
+.progress-step {
+    text-align: center;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    font-size: 13px;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.progress-step::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    border: 2px solid #fff;
+    z-index: 2;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.progress-step.active {
+    color: #3498db;
+    font-weight: 600;
+}
+
+.progress-step.active::before {
+    background-color: #3498db;
+    border-color: #fff;
+}
+
+.progress-step.completed {
+    color: #2ecc71;
+}
+
+.progress-step.completed::before {
+    background-color: #2ecc71;
+    border-color: #fff;
+}
+
+.progress-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.progress-stat {
+    display: flex;
+    align-items: center;
+}
+
+.progress-stat-icon {
+    margin-right: 8px;
+    color: #6c757d;
+}
+
+.progress-stat-value {
+    font-weight: 600;
+    color: #495057;
+}
+
+/* 添加动画效果 */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(52, 152, 219, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+    }
+}
+
+.progress-container.active .progress-bar {
+    animation: pulse 2s infinite;
+}
+
     </style>
+    <!-- 引入SocketIO客户端 -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -377,6 +591,59 @@
             
             <div class="folder-list" id="folder-list"></div>
         </div>
+        
+        <!-- 进度条 -->
+<div class="progress-container" id="progress-container">
+    <div class="progress-header">
+        <div class="progress-title">处理进度</div>
+        <div class="progress-percentage" id="progress-percent">0%</div>
+    </div>
+    
+    <div class="progress-bar-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+    </div>
+    
+    <div class="progress-info">
+        <div class="progress-status" id="progress-status">准备就绪</div>
+        <div class="progress-details">
+            <div class="progress-current" id="progress-current">0/0</div>
+            <div class="progress-eta">
+                <span class="progress-eta-icon">⏱</span>
+                <span id="progress-eta">预计剩余时间: 计算中...</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="progress-steps">
+        <div class="progress-step" id="step-collect">
+            <div>收集图片</div>
+        </div>
+        <div class="progress-step" id="step-compare">
+            <div>比较相似度</div>
+        </div>
+        <div class="progress-step" id="step-complete">
+            <div>完成</div>
+        </div>
+    </div>
+    
+    <div class="progress-stats">
+        <div class="progress-stat">
+            <span class="progress-stat-icon">📁</span>
+            <span>已处理: <span class="progress-stat-value" id="stat-processed">0</span> 张图片</span>
+        </div>
+        <div class="progress-stat">
+            <span class="progress-stat-icon">🔍</span>
+            <span>已比较: <span class="progress-stat-value" id="stat-compared">0</span> 对图片</span>
+        </div>
+        <div class="progress-stat">
+            <span class="progress-stat-icon">📊</span>
+            <span>相似组: <span class="progress-stat-value" id="stat-groups">0</span> 个</span>
+        </div>
+    </div>
+</div>
+
         
         <div class="loading" id="loading">
             <p>正在处理图片，请稍候... (首次处理可能需要较长时间)</p>
@@ -418,9 +685,121 @@
             const confirmTitle = document.getElementById('confirm-title');
             const confirmMessage = document.getElementById('confirm-message');
             
+            // 进度条相关元素
+            const progressContainer = document.getElementById('progress-container');
+            const progressFill = document.getElementById('progress-fill');
+            const progressStatus = document.getElementById('progress-status');
+            const progressPercent = document.getElementById('progress-percent');
+            const progressCurrent = document.getElementById('progress-current');
+            const progressETA = document.getElementById('progress-eta');
+            
+            // 进度步骤相关元素
+            const stepCollect = document.getElementById('step-collect');
+            const stepCompare = document.getElementById('step-compare');
+            const stepComplete = document.getElementById('step-complete');
+            
             let selectedFolders = [];
             let currentAction = null;
             let currentActionData = null;
+            let processingStartTime = null;
+            let lastProgressUpdate = null;
+            
+            // 初始化SocketIO连接
+            const socket = io();
+            
+            // 监听进度更新事件
+            socket.on('progress', function(data) {
+                // 更新进度条
+                progressFill.style.width = data.percent + '%';
+                progressStatus.textContent = data.status;
+                progressPercent.textContent = data.percent + '%';
+                
+                // 显示进度条
+                progressContainer.classList.add('active');
+                
+                // 更新进度步骤状态
+                if (data.percent < 40) {
+                    // 收集图片阶段
+                    stepCollect.classList.add('active');
+                    stepCompare.classList.remove('active');
+                    stepComplete.classList.remove('completed');
+                } else if (data.percent < 100) {
+                    // 比较相似度阶段
+                    stepCollect.classList.remove('active');
+                    stepCollect.classList.add('completed');
+                    stepCompare.classList.add('active');
+                    stepComplete.classList.remove('completed');
+                } else {
+                    // 完成阶段
+                    stepCollect.classList.remove('active');
+                    stepCollect.classList.add('completed');
+                    stepCompare.classList.remove('active');
+                    stepCompare.classList.add('completed');
+                    stepComplete.classList.add('active');
+                }
+                
+                // 更新当前进度
+                if (data.current !== undefined && data.total !== undefined) {
+                    progressCurrent.textContent = `${data.current}/${data.total}`;
+                }
+                
+                // 计算并更新ETA
+                if (processingStartTime && lastProgressUpdate) {
+                    const now = Date.now();
+                    const timeDiff = now - lastProgressUpdate.time;
+                    
+                    if (timeDiff > 0) {
+                        const progressDiff = data.percent - lastProgressUpdate.percent;
+                        
+                        if (progressDiff > 0) {
+                            // 计算每毫秒完成的进度
+                            const speed = progressDiff / timeDiff;
+                            
+                            // 计算剩余时间（毫秒）
+                            const remainingProgress = 100 - data.percent;
+                            const remainingTime = remainingProgress / speed;
+                            
+                            // 格式化剩余时间
+                            if (remainingTime < 1000) {
+                                progressETA.textContent = '预计剩余时间: 即将完成';
+                            } else if (remainingTime < 60000) {
+                                progressETA.textContent = `预计剩余时间: ${Math.round(remainingTime / 1000)}秒`;
+                            } else {
+                                progressETA.textContent = `预计剩余时间: ${Math.round(remainingTime / 60000)}分钟`;
+                            }
+                        }
+                    }
+                }
+                
+                // 更新最后进度更新时间
+                lastProgressUpdate = {
+                    time: Date.now(),
+                    percent: data.percent
+                };
+            });
+            
+            // 监听处理完成事件
+            socket.on('processing_complete', function(data) {
+                // 隐藏进度条
+                progressContainer.classList.remove('active');
+                
+                // 重置处理时间
+                processingStartTime = null;
+                lastProgressUpdate = null;
+                
+                if (data.success) {
+                    // 显示图片组
+                    displayImageGroups(data.groups);
+                    showNotification('处理完成！');
+                    
+                    // 重置进度步骤状态
+                    stepCollect.classList.remove('active', 'completed');
+                    stepCompare.classList.remove('active', 'completed');
+                    stepComplete.classList.remove('active', 'completed');
+                } else {
+                    showNotification('处理失败: ' + data.error, true);
+                }
+            });
             
             // 显示通知
             function showNotification(message, isError = false) {
@@ -518,7 +897,24 @@
                     return;
                 }
                 
-                loading.classList.add('active');
+                // 显示进度条
+                progressContainer.classList.add('active');
+                progressFill.style.width = '0%';
+                progressStatus.textContent = '准备处理...';
+                progressPercent.textContent = '0%';
+                progressCurrent.textContent = '0/0';
+                progressETA.textContent = '预计剩余时间: 计算中...';
+                
+                // 重置进度步骤状态
+                stepCollect.classList.add('active');
+                stepCompare.classList.remove('active', 'completed');
+                stepComplete.classList.remove('active', 'completed');
+                
+                // 记录处理开始时间
+                processingStartTime = Date.now();
+                lastProgressUpdate = null;
+                
+                // 清空结果容器
                 resultsContainer.innerHTML = '';
                 
                 try {
@@ -529,23 +925,21 @@
                         },
                         body: JSON.stringify({
                             threshold: parseInt(similarityThreshold.value),
-                            hash_size: parseInt(hashSize.value)
+                            hash_size: parseInt(hashSize.value),
+                            socket_id: socket.id  // 传递SocketIO ID
                         })
                     });
                     
                     const data = await response.json();
                     
                     if (!data.success) {
-                        throw new Error(data.error || '处理图片时出错');
+                        throw new Error(data.error || '启动处理失败');
                     }
                     
-                    // 显示图片组
-                    displayImageGroups(data.groups);
-                    
+                    // 处理已在后台进行，等待SocketIO事件
                 } catch (error) {
                     showNotification(error.message, true);
-                } finally {
-                    loading.classList.remove('active');
+                    progressContainer.classList.remove('active');
                 }
             });
             

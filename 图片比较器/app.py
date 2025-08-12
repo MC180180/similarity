@@ -15,10 +15,15 @@ from PIL import Image
 import imagehash
 import io
 import base64
+from flask_socketio import SocketIO
+import itertools
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# 添加SocketIO支持
+socketio = SocketIO(app)
 
 # 全局变量存储选中的文件夹路径
 selected_folders = []
@@ -139,7 +144,7 @@ def calculate_similarity(hash1, hash2):
     similarity = (1 - distance / max_distance) * 100
     return similarity
 
-def process_images(folder_paths, threshold, hash_size):
+def process_images(folder_paths, threshold, hash_size, socket_id=None):
     """处理文件夹中的图片，找出相似的图片组"""
     global image_groups
     image_groups = []
@@ -161,17 +166,38 @@ def process_images(folder_paths, threshold, hash_size):
                     full_path = os.path.normpath(os.path.join(root, file))
                     image_paths.append(full_path)
     
-    print(f"Found {len(image_paths)} images")
+    total_images = len(image_paths)
+    print(f"Found {total_images} images")
+    
+    # 发送初始进度
+    if socket_id:
+        socketio.emit('progress', {
+            'current': 0, 
+            'total': total_images, 
+            'percent': 0, 
+            'status': '正在收集图片...',
+            'stage': 'collect'
+        }, room=socket_id)
     
     # 计算每张图片的多种哈希值
     phashes = {}
     ahashes = {}
     dhashes = {}
     
-    for image_path in image_paths:
+    for i, image_path in enumerate(image_paths):
         # 规范化路径
         image_path = os.path.normpath(image_path)
-        print(f"Processing image: {image_path}")
+        
+        # 发送进度更新
+        if socket_id and i % 5 == 0:  # 每5张图片更新一次进度，避免过于频繁
+            progress = int((i / total_images) * 40)  # 收集图片阶段占总进度的40%
+            socketio.emit('progress', {
+                'current': i, 
+                'total': total_images, 
+                'percent': progress,
+                'status': f'正在处理图片 {os.path.basename(image_path)}...',
+                'stage': 'collect'
+            }, room=socket_id)
         
         # 计算多种哈希值
         phash = calculate_phash(image_path, hash_size)
@@ -189,11 +215,26 @@ def process_images(folder_paths, threshold, hash_size):
     print(f"Calculated ahashes for {len(ahashes)} images")
     print(f"Calculated dhashes for {len(dhashes)} images")
     
+    # 发送比较进度开始
+    if socket_id:
+        socketio.emit('progress', {
+            'current': 0, 
+            'total': total_images, 
+            'percent': 40,
+            'status': '开始比较图片相似度...',
+            'stage': 'compare'
+        }, room=socket_id)
+    
     # 找出相似的图片组
     similarity_groups = []
     processed_images = set()
     
-    for image_path in image_paths:
+    # 计算需要比较的图片对总数
+    total_comparisons = total_images * (total_images - 1) // 2
+    completed_comparisons = 0
+    
+    # 为每张图片找相似图片
+    for i, image_path in enumerate(image_paths):
         # 规范化路径
         image_path = os.path.normpath(image_path)
         
@@ -205,11 +246,10 @@ def process_images(folder_paths, threshold, hash_size):
         processed_images.add(image_path)
         
         # 查找与当前图片相似的其他图片
-        for other_path in image_paths:
-            # 规范化路径
-            other_path = os.path.normpath(other_path)
+        for j in range(i + 1, len(image_paths)):  # 优化循环，避免重复比较
+            other_path = image_paths[j]
             
-            if other_path in processed_images or other_path == image_path:
+            if other_path in processed_images:
                 continue
             
             # 计算多种哈希的相似度
@@ -234,6 +274,21 @@ def process_images(folder_paths, threshold, hash_size):
             if combined_sim >= threshold:
                 current_group.append(other_path)
                 processed_images.add(other_path)
+            
+            # 更新比较进度
+            completed_comparisons += 1
+            
+            # 每完成5次比较更新一次进度，避免过于频繁
+            if socket_id and completed_comparisons % 5 == 0:
+                # 比较阶段占总进度的60% (40% -> 100%)
+                progress = 40 + int((completed_comparisons / total_comparisons) * 60)
+                socketio.emit('progress', {
+                    'current': completed_comparisons, 
+                    'total': total_comparisons, 
+                    'percent': progress,
+                    'status': f'正在比较图片相似度... {os.path.basename(image_path)} vs {os.path.basename(other_path)}',
+                    'stage': 'compare'
+                }, room=socket_id)
         
         # 只有当组内有超过一张图片时才添加到结果中
         if len(current_group) > 1:
@@ -246,6 +301,16 @@ def process_images(folder_paths, threshold, hash_size):
     
     # 保存到全局变量
     image_groups = similarity_groups
+    
+    # 发送完成进度
+    if socket_id:
+        socketio.emit('progress', {
+            'current': total_comparisons, 
+            'total': total_comparisons, 
+            'percent': 100,
+            'status': '处理完成！',
+            'stage': 'complete'
+        }, room=socket_id)
     
     return similarity_groups
 
@@ -343,72 +408,82 @@ def process_images_route():
     data = request.get_json()
     threshold = float(data.get('threshold', 80))
     hash_size = int(data.get('hash_size', 8))
+    socket_id = data.get('socket_id')
     
     if not selected_folders:
         return jsonify({'error': '没有选择文件夹'}), 400
     
-    try:
-        # 处理图片，找出相似的图片组
-        similarity_groups = process_images(selected_folders, threshold, hash_size)
-        
-        # 准备返回给前端的数据
-        result = []
-        for group in similarity_groups:
-            group_data = []
+    # 在新线程中处理图片，避免阻塞
+    def process_thread():
+        try:
+            # 处理图片，找出相似的图片组
+            similarity_groups = process_images(selected_folders, threshold, hash_size, socket_id)
             
-            # 计算组内所有图片之间的平均相似度
-            similarities = []
-            for i in range(len(group)):
-                for j in range(i + 1, len(group)):
-                    try:
-                        # 计算多种哈希的相似度
-                        phash1 = calculate_phash(group[i], hash_size)
-                        phash2 = calculate_phash(group[j], hash_size)
-                        ahash1 = calculate_ahash(group[i], hash_size)
-                        ahash2 = calculate_ahash(group[j], hash_size)
-                        dhash1 = calculate_dhash(group[i], hash_size)
-                        dhash2 = calculate_dhash(group[j], hash_size)
-                        
-                        phash_sim = calculate_similarity(phash1, phash2) if phash1 and phash2 else 0
-                        ahash_sim = calculate_similarity(ahash1, ahash2) if ahash1 and ahash2 else 0
-                        dhash_sim = calculate_similarity(dhash1, dhash2) if dhash1 and dhash2 else 0
-                        
-                        # 综合相似度（加权平均）
-                        combined_sim = (phash_sim * 0.5 + ahash_sim * 0.3 + dhash_sim * 0.2)
-                        similarities.append(combined_sim)
-                    except Exception as e:
-                        print(f"Error calculating similarity: {str(e)}")
-            
-            avg_similarity = sum(similarities) / len(similarities) if similarities else 0
-            
-            # 获取组内最佳图片
-            best_image = get_best_image_in_group(group)
-            
-            # 准备组内图片数据
-            for image_path in group:
-                # 规范化路径
-                image_path = os.path.normpath(image_path)
+            # 准备返回给前端的数据
+            result = []
+            for group in similarity_groups:
+                group_data = []
                 
-                group_data.append({
-                    "path": image_path,
-                    "name": os.path.basename(image_path),
-                    "base64": image_to_base64(image_path),
-                    "size": os.path.getsize(image_path) if os.path.exists(image_path) else 0,
-                    "is_best": image_path == best_image
+                # 计算组内所有图片之间的平均相似度
+                similarities = []
+                for i in range(len(group)):
+                    for j in range(i + 1, len(group)):
+                        try:
+                            # 计算多种哈希的相似度
+                            phash1 = calculate_phash(group[i], hash_size)
+                            phash2 = calculate_phash(group[j], hash_size)
+                            ahash1 = calculate_ahash(group[i], hash_size)
+                            ahash2 = calculate_ahash(group[j], hash_size)
+                            dhash1 = calculate_dhash(group[i], hash_size)
+                            dhash2 = calculate_dhash(group[j], hash_size)
+                            
+                            phash_sim = calculate_similarity(phash1, phash2) if phash1 and phash2 else 0
+                            ahash_sim = calculate_similarity(ahash1, ahash2) if ahash1 and ahash2 else 0
+                            dhash_sim = calculate_similarity(dhash1, dhash2) if dhash1 and dhash2 else 0
+                            
+                            # 综合相似度（加权平均）
+                            combined_sim = (phash_sim * 0.5 + ahash_sim * 0.3 + dhash_sim * 0.2)
+                            similarities.append(combined_sim)
+                        except Exception as e:
+                            print(f"Error calculating similarity: {str(e)}")
+                
+                avg_similarity = sum(similarities) / len(similarities) if similarities else 0
+                
+                # 获取组内最佳图片
+                best_image = get_best_image_in_group(group)
+                
+                # 准备组内图片数据
+                for image_path in group:
+                    # 规范化路径
+                    image_path = os.path.normpath(image_path)
+                    
+                    group_data.append({
+                        "path": image_path,
+                        "name": os.path.basename(image_path),
+                        "base64": image_to_base64(image_path),
+                        "size": os.path.getsize(image_path) if os.path.exists(image_path) else 0,
+                        "is_best": image_path == best_image
+                    })
+                
+                result.append({
+                    "images": group_data,
+                    "similarity": round(avg_similarity, 2)
                 })
             
-            result.append({
-                "images": group_data,
-                "similarity": round(avg_similarity, 2)
-            })
-        
-        return jsonify({
-            "success": True,
-            "groups": result
-        })
-    except Exception as e:
-        print(f"Error in process_images: {str(e)}")
-        return jsonify({'error': f'处理图片时出错: {str(e)}'}), 500
+            # 发送完成事件
+            socketio.emit('processing_complete', {'success': True, 'groups': result}, room=socket_id)
+        except Exception as e:
+            print(f"Error in process_images: {str(e)}")
+            # 发送错误事件
+            socketio.emit('processing_complete', {'success': False, 'error': str(e)}, room=socket_id)
+    
+    # 启动处理线程
+    thread = threading.Thread(target=process_thread)
+    thread.daemon = True
+    thread.start()
+    
+    # 立即返回响应，处理将在后台进行
+    return jsonify({'success': True, 'message': '处理已开始'})
 
 @app.route('/delete_image', methods=['POST'])
 def delete_image():
@@ -510,4 +585,5 @@ if __name__ == '__main__':
     # 自动打开浏览器
     open_browser()
     
-    app.run(debug=False, port=18200)
+    # 使用SocketIO运行应用
+    socketio.run(app, debug=False, port=18200)
