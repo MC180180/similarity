@@ -25,7 +25,7 @@ pip install flask pillow imagehash numpy
 1. 运行程序：
 
 ```bash
-python main.py
+python app.py
 ```
 
 2. 程序会自动打开浏览器，访问 http://127.0.0.1:18200
@@ -73,7 +73,7 @@ python main.py
 
 ---
 
-ELLRA蓝电 | -Love Asuka-
+ELLRA蓝电
 
 ## 开发原因
 
