@@ -17,7 +17,7 @@
 2. 安装所需的依赖包：
 
 ```bash
-pip install flask pillow imagehash numpy opencv-python
+pip install flask pillow imagehash numpy 
 ```
 
 ## 使用方法
@@ -25,7 +25,7 @@ pip install flask pillow imagehash numpy opencv-python
 1. 运行程序：
 
 ```bash
-python app.py
+python main.py
 ```
 
 2. 程序会自动打开浏览器，访问 http://127.0.0.1:18200
@@ -73,7 +73,7 @@ python app.py
 
 ---
 
-ELLRA蓝电
+ELLRA蓝电 | -Love Asuka-
 
 ## 开发原因
 
