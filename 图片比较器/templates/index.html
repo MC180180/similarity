@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片比较器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: calc(100vh - 40px); /* 减去padding的高度 */
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            flex: 1;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .settings-panel {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .select-folder-btn {
+            background-color: #2ecc71;
+            margin-right: 10px;
+        }
+        .select-folder-btn:hover {
+            background-color: #27ae60;
+        }
+        .clear-folders-btn {
+            background-color: #e74c3c;
+            margin-right: 10px;
+        }
+        .clear-folders-btn:hover {
+            background-color: #c0392b;
+        }
+        .auto-delete-btn {
+            background-color: #f39c12;
+            margin-right: 10px;
+        }
+        .auto-delete-btn:hover {
+            background-color: #e67e22;
+        }
+        .folder-list {
+            margin-top: 10px;
+        }
+        .folder-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background-color: #f1f1f1;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+        .folder-item button {
+            background-color: #e74c3c;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .folder-item button:hover {
+            background-color: #c0392b;
+        }
+        .image-group {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .group-header {
+            background-color: #3498db;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+        }
+        .image-item {
+            margin: 10px;
+            text-align: center;
+            position: relative;
+            width: calc(25% - 20px);
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 5px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+        .image-item:hover {
+            border-color: #e74c3c;
+            transform: scale(1.02);
+        }
+        .image-item.best {
+            border: 2px solid #2ecc71;
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+        }
+        .image-item.best:hover {
+            border-color: #e74c3c;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+        }
+        .image-item img {
+            max-width: 100%;
+            height: 200px;
+            object-fit: contain;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .image-info {
+            margin-top: 8px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .similarity-text {
+            color: #3498db;
+            font-weight: bold;
+            margin-top: 3px;
+        }
+        .best-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background-color: #2ecc71;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            z-index: 10;
+        }
+        .delete-hint {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: rgba(231, 76, 60, 0.8);
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .image-item:hover .delete-hint {
+            opacity: 1;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loading.active {
+            display: block;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            background-color: #2ecc71;
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+        }
+        .notification.error {
+            background-color: #e74c3c;
+        }
+        .notification.show {
+            display: block;
+            animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
+            animation-fill-mode: forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .no-images {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .folder-selection {
+            margin-bottom: 15px;
+        }
+        .image-row {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+        }
+        .image-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .image-row-title {
+            width: 100%;
+            padding: 8px;
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .settings-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .settings-row > div {
+            margin-right: 20px;
+        }
+        .confirm-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .confirm-dialog-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 100%;
+        }
+        .confirm-dialog-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        .confirm-dialog-message {
+            margin-bottom: 20px;
+            color: #555;
+        }
+        .confirm-dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .confirm-dialog-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .confirm-dialog-btn.cancel {
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+        }
+        .confirm-dialog-btn.cancel:hover {
+            background-color: #d5dbdb;
+        }
+        .confirm-dialog-btn.confirm {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .confirm-dialog-btn.confirm:hover {
+            background-color: #c0392b;
+        }
+        .action-buttons {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .group-checkbox {
+            margin-right: 5px;
+        }
+        .select-all-btn {
+            background-color: #9b59b6;
+            margin-right: 10px;
+        }
+        .select-all-btn:hover {
+            background-color: #8e44ad;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            color: #bbb;
+            font-size: 12px;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>图片比较器</h1>
+        
+        <div class="settings-panel">
+            <div class="settings-row">
+                <div>
+                    <label for="similarity-threshold">相似度阈值 (%):</label>
+                    <input type="number" id="similarity-threshold" min="1" max="100" value="80">
+                    <div class="help-text">建议值：70-90，值越高匹配越严格</div>
+                </div>
+                <div>
+                    <label for="hash-size">哈希大小:</label>
+                    <input type="number" id="hash-size" min="4" max="16" value="8">
+                    <div class="help-text">值越高精度越高，但计算越慢</div>
+                </div>
+            </div>
+            
+            <div class="folder-selection">
+                <button id="select-folder-btn" class="select-folder-btn">选择文件夹</button>
+                <button id="clear-folders-btn" class="clear-folders-btn">清空文件夹</button>
+                <button id="process-btn" disabled>处理图片</button>
+            </div>
+            
+            <div class="folder-list" id="folder-list"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <p>正在处理图片，请稍候... (首次处理可能需要较长时间)</p>
+        </div>
+        
+        <div id="results-container"></div>
+    </div>
+    
+    <div class="footer">ELLRA蓝电</div>
+    
+    <div class="notification" id="notification"></div>
+    
+    <!-- 确认对话框 -->
+    <div id="confirm-dialog" class="confirm-dialog" style="display: none;">
+        <div class="confirm-dialog-content">
+            <div class="confirm-dialog-title" id="confirm-title">确认操作</div>
+            <div class="confirm-dialog-message" id="confirm-message">确定要执行此操作吗？</div>
+            <div class="confirm-dialog-buttons">
+                <button id="cancel-action" class="confirm-dialog-btn cancel">取消</button>
+                <button id="confirm-action" class="confirm-dialog-btn confirm">确认</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectFolderBtn = document.getElementById('select-folder-btn');
+            const clearFoldersBtn = document.getElementById('clear-folders-btn');
+            const folderList = document.getElementById('folder-list');
+            const processBtn = document.getElementById('process-btn');
+            const loading = document.getElementById('loading');
+            const resultsContainer = document.getElementById('results-container');
+            const similarityThreshold = document.getElementById('similarity-threshold');
+            const hashSize = document.getElementById('hash-size');
+            const notification = document.getElementById('notification');
+            const confirmDialog = document.getElementById('confirm-dialog');
+            const cancelActionBtn = document.getElementById('cancel-action');
+            const confirmActionBtn = document.getElementById('confirm-action');
+            const confirmTitle = document.getElementById('confirm-title');
+            const confirmMessage = document.getElementById('confirm-message');
+            
+            let selectedFolders = [];
+            let currentAction = null;
+            let currentActionData = null;
+            
+            // 显示通知
+            function showNotification(message, isError = false) {
+                notification.textContent = message;
+                notification.className = 'notification show';
+                if (isError) {
+                    notification.classList.add('error');
+                }
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+            
+            // 更新文件夹列表
+            function updateFolderList() {
+                folderList.innerHTML = '';
+                selectedFolders.forEach((folder, index) => {
+                    const folderItem = document.createElement('div');
+                    folderItem.className = 'folder-item';
+                    folderItem.innerHTML = `
+                        <span>${folder}</span>
+                        <button data-index="${index}">移除</button>
+                    `;
+                    folderList.appendChild(folderItem);
+                });
+                
+                processBtn.disabled = selectedFolders.length === 0;
+            }
+            
+            // 选择文件夹按钮点击事件
+            selectFolderBtn.addEventListener('click', async function() {
+                try {
+                    const response = await fetch('/select_folder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        selectedFolders = data.folders || [];
+                        updateFolderList();
+                        if (data.folders && data.folders.length > 0) {
+                            const newFolder = data.folders[data.folders.length - 1];
+                            showNotification(`已添加文件夹: ${newFolder}`);
+                        }
+                    } else {
+                        throw new Error('选择文件夹时出错');
+                    }
+                } catch (error) {
+                    showNotification(error.message, true);
+                }
+            });
+            
+            // 清空文件夹按钮点击事件
+            clearFoldersBtn.addEventListener('click', async function() {
+                try {
+                    const response = await fetch('/clear_folders', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        selectedFolders = [];
+                        updateFolderList();
+                        showNotification('已清空所有文件夹');
+                    } else {
+                        throw new Error('清空文件夹时出错');
+                    }
+                } catch (error) {
+                    showNotification(error.message, true);
+                }
+            });
+            
+            // 移除文件夹
+            folderList.addEventListener('click', function(e) {
+                if (e.target.tagName === 'BUTTON') {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    selectedFolders.splice(index, 1);
+                    updateFolderList();
+                }
+            });
+            
+            // 处理图片按钮点击事件
+            processBtn.addEventListener('click', async function() {
+                if (selectedFolders.length === 0) {
+                    showNotification('请至少选择一个文件夹', true);
+                    return;
+                }
+                
+                loading.classList.add('active');
+                resultsContainer.innerHTML = '';
+                
+                try {
+                    const response = await fetch('/process_images', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            threshold: parseInt(similarityThreshold.value),
+                            hash_size: parseInt(hashSize.value)
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (!data.success) {
+                        throw new Error(data.error || '处理图片时出错');
+                    }
+                    
+                    // 显示图片组
+                    displayImageGroups(data.groups);
+                    
+                } catch (error) {
+                    showNotification(error.message, true);
+                } finally {
+                    loading.classList.remove('active');
+                }
+            });
+            
+            // 显示图片组
+            function displayImageGroups(groups) {
+                if (groups.length === 0) {
+                    resultsContainer.innerHTML = '<div class="no-images">未找到相似的图片</div>';
+                    return;
+                }
+                
+                resultsContainer.innerHTML = '';
+                
+                // 创建操作按钮区域
+                const actionButtons = document.createElement('div');
+                actionButtons.className = 'action-buttons';
+                
+                const leftButtons = document.createElement('div');
+                
+                const selectAllBtn = document.createElement('button');
+                selectAllBtn.className = 'select-all-btn';
+                selectAllBtn.textContent = '全选';
+                selectAllBtn.addEventListener('click', function() {
+                    const checkboxes = document.querySelectorAll('.group-checkbox');
+                    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                    checkboxes.forEach(cb => cb.checked = !allChecked);
+                    selectAllBtn.textContent = allChecked ? '全选' : '取消全选';
+                });
+                leftButtons.appendChild(selectAllBtn);
+                
+                const autoDeleteBtn = document.createElement('button');
+                autoDeleteBtn.className = 'auto-delete-btn';
+                autoDeleteBtn.textContent = '自动删除';
+                autoDeleteBtn.addEventListener('click', function() {
+                    const selectedGroups = [];
+                    document.querySelectorAll('.group-checkbox:checked').forEach(cb => {
+                        selectedGroups.push(parseInt(cb.value));
+                    });
+                    
+                    if (selectedGroups.length === 0) {
+                        showNotification('请至少选择一个组', true);
+                        return;
+                    }
+                    
+                    // 设置当前操作和数据
+                    currentAction = 'auto_delete';
+                    currentActionData = { group_indices: selectedGroups };
+                    
+                    // 显示确认对话框
+                    confirmTitle.textContent = '确认自动删除';
+                    confirmMessage.textContent = `确定要自动删除所选 ${selectedGroups.length} 个组中的非最佳图片吗？此操作不可撤销。`;
+                    confirmDialog.style.display = 'flex';
+                });
+                leftButtons.appendChild(autoDeleteBtn);
+                
+                actionButtons.appendChild(leftButtons);
+                resultsContainer.appendChild(actionButtons);
+                
+                // 创建一个标题容器
+                const titleContainer = document.createElement('div');
+                titleContainer.className = 'image-row-title';
+                titleContainer.textContent = '相似图片组';
+                resultsContainer.appendChild(titleContainer);
+                
+                // 为每个相似图片组创建一行
+                groups.forEach((group, groupIndex) => {
+                    const imageRow = document.createElement('div');
+                    imageRow.className = 'image-row';
+                    imageRow.dataset.groupIndex = groupIndex;
+                    
+                    // 添加组标题
+                    const groupTitle = document.createElement('div');
+                    groupTitle.style.width = '150px';
+                    groupTitle.style.padding = '10px';
+                    groupTitle.style.fontWeight = 'bold';
+                    groupTitle.style.backgroundColor = '#3498db';
+                    groupTitle.style.color = 'white';
+                    groupTitle.style.borderRadius = '4px';
+                    groupTitle.style.marginRight = '10px';
+                    groupTitle.style.textAlign = 'center';
+                    groupTitle.style.flexShrink = '0';
+                    groupTitle.innerHTML = `
+                        <input type="checkbox" class="group-checkbox" value="${groupIndex}" style="margin-right: 5px;">
+                        组 ${groupIndex + 1}<br>
+                        <small>相似度: ${group.similarity}%</small>
+                    `;
+                    imageRow.appendChild(groupTitle);
+                    
+                    // 添加组内图片
+                    group.images.forEach((image, imageIndex) => {
+                        const imageItem = document.createElement('div');
+                        imageItem.className = 'image-item';
+                        if (image.is_best) {
+                            imageItem.classList.add('best');
+                        }
+                        imageItem.style.flexShrink = '0';
+                        imageItem.style.width = '200px';
+                        imageItem.dataset.groupIndex = groupIndex;
+                        imageItem.dataset.imageIndex = imageIndex;
+                        imageItem.dataset.path = image.path;
+                        
+                        const img = document.createElement('img');
+                        // 确保base64数据正确格式化
+                        img.src = `data:image/png;base64,${image.base64}`;
+                        img.alt = image.name;
+                        // 添加错误处理
+                        img.onerror = function() {
+                            this.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2NjYyIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHJ4PSIyIiByeT0iMiI+PC9yZWN0PjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ij48L2NpcmNsZT48cGF0aCBkPSJNMjEgMTVWMThBMiAyIDAgMCAxIDE5IDIxSDVhMiAyIDAgMCAxLTItMlYxNSI+PC9wYXRoPjwvc3ZnPg==';
+                            this.onerror = null; // 防止无限循环
+                        };
+                        
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'image-info';
+                        infoDiv.textContent = image.name;
+                        
+                        const sizeDiv = document.createElement('div');
+                        sizeDiv.className = 'similarity-text';
+                        sizeDiv.textContent = formatFileSize(image.size);
+                        infoDiv.appendChild(sizeDiv);
+                        
+                        // 如果是最佳图片，添加标记
+                        if (image.is_best) {
+                            const bestBadge = document.createElement('div');
+                            bestBadge.className = 'best-badge';
+                            bestBadge.textContent = '最佳';
+                            imageItem.appendChild(bestBadge);
+                        }
+                        
+                        // 添加删除提示
+                        const deleteHint = document.createElement('div');
+                        deleteHint.className = 'delete-hint';
+                        deleteHint.textContent = '点击删除';
+                        imageItem.appendChild(deleteHint);
+                        
+                        // 添加点击事件删除图片
+                        imageItem.addEventListener('click', function() {
+                            const imagePath = this.getAttribute('data-path');
+                            const groupIndex = parseInt(this.getAttribute('data-group-index'));
+                            const imageIndex = parseInt(this.getAttribute('data-image-index'));
+                            
+                            // 直接删除，不需要确认
+                            deleteImage(imagePath, groupIndex, imageIndex);
+                        });
+                        
+                        imageItem.appendChild(img);
+                        imageItem.appendChild(infoDiv);
+                        imageRow.appendChild(imageItem);
+                    });
+                    
+                    resultsContainer.appendChild(imageRow);
+                });
+            }
+            
+            // 删除图片函数
+            async function deleteImage(imagePath, groupIndex, imageIndex) {
+                try {
+                    const response = await fetch('/delete_image', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            image_path: imagePath
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 从UI中移除图片项
+                        const imageItem = document.querySelector(`.image-item[data-group-index="${groupIndex}"][data-image-index="${imageIndex}"]`);
+                        const imageRow = imageItem.parentNode;
+                        
+                        // 检查行中是否还有其他图片（除了组标题）
+                        const remainingImages = imageRow.querySelectorAll('.image-item').length - 1;
+                        
+                        imageItem.remove();
+                        
+                        // 如果行中没有图片了（除了组标题），移除整行
+                        if (remainingImages === 0) {
+                            imageRow.remove();
+                        }
+                        
+                        showNotification('图片已删除');
+                    } else {
+                        throw new Error(data.error || '删除图片时出错');
+                    }
+                } catch (error) {
+                    showNotification(error.message, true);
+                }
+            }
+            
+            // 取消操作按钮点击事件
+            cancelActionBtn.addEventListener('click', function() {
+                confirmDialog.style.display = 'none';
+                currentAction = null;
+                currentActionData = null;
+            });
+            
+            // 确认操作按钮点击事件
+            confirmActionBtn.addEventListener('click', async function() {
+                if (!currentAction || !currentActionData) {
+                    confirmDialog.style.display = 'none';
+                    return;
+                }
+                
+                try {
+                    let response;
+                    
+                    if (currentAction === 'auto_delete') {
+                        response = await fetch('/auto_delete', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(currentActionData)
+                        });
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        if (currentAction === 'auto_delete') {
+                            // 更新UI，移除已删除的图片
+                            currentActionData.group_indices.forEach(groupIndex => {
+                                const imageRow = document.querySelector(`.image-row[data-group-index="${groupIndex}"]`);
+                                if (imageRow) {
+                                    // 只保留最佳图片
+                                    const imageItems = imageRow.querySelectorAll('.image-item');
+                                    imageItems.forEach(item => {
+                                        if (!item.classList.contains('best')) {
+                                            item.remove();
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            showNotification(data.message || '自动删除完成');
+                        }
+                    } else {
+                        throw new Error(data.error || '操作失败');
+                    }
+                } catch (error) {
+                    showNotification(error.message, true);
+                } finally {
+                    confirmDialog.style.display = 'none';
+                    currentAction = null;
+                    currentActionData = null;
+                }
+            });
+            
+            // 格式化文件大小
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        });
+    </script>
+</body>
+</html>
