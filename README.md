@@ -73,7 +73,7 @@ python main.py
 
 ---
 
-ELLRA蓝电
+ELLRA蓝电 | —Love Asuka-
 
 ## 开发原因
 
