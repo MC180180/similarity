@@ -64,7 +64,7 @@ python app.py
 
 ## 技术栈
 
-- 后端：Python, Flask, OpenCV, PIL, imagehash
+- 后端：Python, Flask, PIL, imagehash
 - 前端：HTML, CSS, JavaScript
 
 ## 许可证
