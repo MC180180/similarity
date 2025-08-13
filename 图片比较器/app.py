@@ -1,68 +1,10 @@
 import os
-import cv2
-import numpy as np
-import tempfile
-import shutil
-import webbrowser
-import threading
-import time
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
-from pathlib import Path
-import tkinter as tk
-from tkinter import filedialog
+from flask import  render_template, request, jsonify
 from PIL import Image
 import imagehash
-import io
-import base64
-
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# 全局变量存储选中的文件夹路径
-selected_folders = []
-image_groups = []
-
-def select_folders():
-    """使用Tkinter选择文件夹"""
-    root = tk.Tk()
-    root.withdraw()  # 隐藏主窗口
-    
-    # 将窗口置顶
-    root.attributes('-topmost', True)
-    
-    # 强制窗口获取焦点
-    root.focus_force()
-    
-    # 将窗口提升到最前面
-    root.lift()
-    
-    folder_paths = filedialog.askdirectory(
-        title='选择包含图片的文件夹',
-        mustexist=True,
-        parent=root  # 指定父窗口
-    )
-    
-    if folder_paths:
-        # 将选中的文件夹路径添加到全局变量中
-        if folder_paths not in selected_folders:
-            selected_folders.append(folder_paths)
-    
-    root.destroy()
-    return folder_paths
-
-def open_folder_dialog():
-    """在单独的线程中打开文件夹选择对话框"""
-    thread = threading.Thread(target=select_folders)
-    thread.daemon = True
-    thread.start()
-
-# 允许的文件扩展名
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+from server import app
+from interactive import selected_folders, open_folder_dialog, allowed_file
+from img import image_to_base64
 
 def calculate_phash(image_path, hash_size=8):
     """计算图像的感知哈希值（使用PIL库）"""
@@ -249,33 +191,6 @@ def process_images(folder_paths, threshold, hash_size):
     
     return similarity_groups
 
-def image_to_base64(image_path):
-    """将图片转换为base64编码"""
-    try:
-        # 使用PIL读取图片
-        img = Image.open(image_path)
-        
-        # 调整图片大小以加快加载速度
-        max_size = 300
-        if max(img.size) > max_size:
-            ratio = max_size / max(img.size)
-            new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
-            img = img.resize(new_size, Image.LANCZOS)
-        
-        # 转换为RGB格式（如果需要）
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        # 保存为PNG到内存
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        img_data = buffer.getvalue()
-        
-        # 转换为base64
-        return base64.b64encode(img_data).decode('utf-8')
-    except Exception as e:
-        print(f"Error converting image to base64: {e}")
-        return ""
 
 def get_best_image_in_group(group):
     """获取一组图片中最佳的图片（基于文件大小和分辨率）"""
@@ -320,6 +235,8 @@ def get_best_image_in_group(group):
     
     # 返回得分最高的图片
     return image_scores[0]['path']
+
+
 
 @app.route('/')
 def index():
@@ -443,6 +360,7 @@ def delete_image():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/auto_delete', methods=['POST'])
+
 def auto_delete():
     """自动删除每组中非最佳的图片"""
     data = request.json
@@ -483,31 +401,3 @@ def auto_delete():
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/cleanup', methods=['POST'])
-def cleanup():
-    try:
-        shutil.rmtree(app.config['UPLOAD_FOLDER'])
-        app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
-        return jsonify({'success': True, 'message': '临时文件已清理'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-def open_browser():
-    """延迟打开浏览器"""
-    def _open_browser():
-        time.sleep(1.5)  # 等待Flask服务器启动
-        webbrowser.open('http://127.0.0.1:18200')
-    
-    thread = threading.Thread(target=_open_browser)
-    thread.daemon = True
-    thread.start()
-
-if __name__ == '__main__':
-    # 启动Flask服务器，并打印标识信息
-    print("Starting Flask server on http://127.0.0.1:18200")
-    
-    # 自动打开浏览器
-    open_browser()
-    
-    app.run(debug=False, port=18200)

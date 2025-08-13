@@ -17,7 +17,7 @@
 2. 安装所需的依赖包：
 
 ```bash
-pip install flask pillow imagehash numpy 
+pip install flask pillow imagehash numpy opencv-python
 ```
 
 ## 使用方法
