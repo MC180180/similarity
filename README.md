@@ -122,6 +122,3 @@ pip install PyQt6 Pillow imagehash numpy pyinstaller
     python gui_app.py
     ```
 3.  在程序窗口中选择文件夹、调整参数并开始处理。所有操作均在程序内完成。
-
----
-*原有的 `README.md` 内容可以保留在下方，作为对项目历史和算法原理的介绍。*
