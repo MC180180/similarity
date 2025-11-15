@@ -1,0 +1,11 @@
+# --- GUI Framework ---
+PyQt6
+
+# --- Image Processing & Hashing ---
+opencv-python
+Pillow
+imagehash
+numpy
+
+# --- Build Tool ---
+pyinstaller
